@@ -119,7 +119,7 @@ const MessagesList = ({
   const isLoading = status === "submitted" || status === "streaming";
 
   return (
-    <Conversation className="flex-1">
+    <Conversation className="">
       <ConversationContent>
         {messages.map((message, index) => (
           <ChatMessage
