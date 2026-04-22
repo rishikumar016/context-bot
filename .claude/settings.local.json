@@ -6,7 +6,9 @@
       "Bash(pnpm typecheck *)",
       "Bash(pnpm run *)",
       "Bash(npx tsc *)",
-      "Bash(echo \"exit=$?\")"
+      "Bash(echo \"exit=$?\")",
+      "Bash(node --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs generate --name=baseline)",
+      "Bash(pnpm db:migrate)"
     ]
   }
 }
