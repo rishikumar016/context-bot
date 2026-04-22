@@ -1,27 +1,6 @@
 "use client";
 
-import {
-  Attachment,
-  AttachmentPreview,
-  AttachmentRemove,
-  Attachments,
-} from "@/components/ai-elements/attachments";
-import {
-  PromptInput,
-  PromptInputActionAddAttachments,
-  PromptInputActionAddScreenshot,
-  PromptInputActionMenu,
-  PromptInputActionMenuContent,
-  PromptInputActionMenuTrigger,
-  PromptInputBody,
-  PromptInputHeader,
-  type PromptInputMessage,
-  PromptInputSubmit,
-  PromptInputTextarea,
-  PromptInputFooter,
-  PromptInputTools,
-  usePromptInputAttachments,
-} from "@/components/ai-elements/prompt-input";
+import { ChatComposer } from "@/components/chat-composer";
 import {
   Conversation,
   ConversationContent,
@@ -32,47 +11,29 @@ import {
   MessageContent,
   MessageResponse,
 } from "@/components/ai-elements/message";
-import { Loader } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useChat } from "@ai-sdk/react";
-import type { UIMessage, ChatStatus } from "ai";
-import { useParams } from "next/navigation";
+import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
+import {
+  Tool,
+  ToolContent,
+  ToolHeader,
+  ToolInput,
+  ToolOutput,
+} from "@/components/ai-elements/tool";
 import { cn } from "@/lib/utils";
-
-// ─── Background Blobs ────────────────────────────────────────────────────────
+import { ingestFiles } from "@/lib/ingest-client";
+import { useChat } from "@ai-sdk/react";
+import type { ChatStatus, UIMessage } from "ai";
+import { Loader } from "lucide-react";
+import { useParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 const BackgroundBlobs = () => (
-  <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
-    <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-500/10 rounded-full mix-blend-normal filter blur-[128px]" />
-    <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full mix-blend-normal filter blur-[128px]" />
-    <div className="absolute top-1/4 right-1/3 w-64 h-64 bg-fuchsia-500/10 rounded-full mix-blend-normal filter blur-[96px]" />
+  <div className="pointer-events-none absolute inset-0 h-full w-full overflow-hidden">
+    <div className="absolute top-0 left-1/4 h-96 w-96 rounded-full bg-violet-500/10 mix-blend-normal blur-[128px]" />
+    <div className="absolute right-1/4 bottom-0 h-96 w-96 rounded-full bg-indigo-500/10 mix-blend-normal blur-[128px]" />
+    <div className="absolute top-1/4 right-1/3 h-64 w-64 rounded-full bg-fuchsia-500/10 mix-blend-normal blur-[96px]" />
   </div>
 );
-
-// ─── Attachments Display ─────────────────────────────────────────────────────
-
-const AttachmentsDisplay = () => {
-  const attachments = usePromptInputAttachments();
-
-  if (attachments.files.length === 0) return null;
-
-  return (
-    <Attachments variant="inline">
-      {attachments.files.map((attachment) => (
-        <Attachment
-          data={attachment}
-          key={attachment.id}
-          onRemove={() => attachments.remove(attachment.id)}
-        >
-          <AttachmentPreview />
-          <AttachmentRemove />
-        </Attachment>
-      ))}
-    </Attachments>
-  );
-};
-
-// ─── Chat Message ────────────────────────────────────────────────────────────
 
 const ChatMessage = ({
   message,
@@ -89,25 +50,45 @@ const ChatMessage = ({
       )}
     >
       {message.parts.map((part, i) => {
+        const key = `${message.id}-${i}`;
+
         if (part.type === "text") {
+          return <MessageResponse key={key}>{part.text}</MessageResponse>;
+        }
+
+        if (part.type === "tool-searchDocs") {
           return (
-            <MessageResponse key={`${message.id}-${i}`}>
-              {part.text}
-            </MessageResponse>
+            <Tool defaultOpen={false} key={key}>
+              <ToolHeader
+                state={part.state}
+                title="Searching your documents"
+                type="tool-searchDocs"
+              />
+              <ToolContent>
+                {part.input ? <ToolInput input={part.input} /> : null}
+                <ToolOutput
+                  errorText={
+                    part.state === "output-error" ? part.errorText : undefined
+                  }
+                  output={
+                    part.state === "output-available" ? part.output : undefined
+                  }
+                />
+              </ToolContent>
+            </Tool>
           );
         }
+
         return null;
       })}
       {isLoading && (
         <div className="flex items-center p-2">
-          <Loader className="animate-spin size-4" />
+          <Loader className="size-4 animate-spin" />
         </div>
       )}
     </MessageContent>
   </Message>
 );
-
-// ─── Messages List ───────────────────────────────────────────────────────────
 
 const MessagesList = ({
   messages,
@@ -119,17 +100,17 @@ const MessagesList = ({
   const isLoading = status === "submitted" || status === "streaming";
 
   return (
-    <Conversation className="">
+    <Conversation>
       <ConversationContent>
         {messages.map((message, index) => (
           <ChatMessage
-            key={message.id}
-            message={message}
             isLoading={
               isLoading &&
               index === messages.length - 1 &&
               message.role === "assistant"
             }
+            key={message.id}
+            message={message}
           />
         ))}
       </ConversationContent>
@@ -138,59 +119,11 @@ const MessagesList = ({
   );
 };
 
-// ─── Chat Input ──────────────────────────────────────────────────────────────
-
-const ChatInput = ({
-  input,
-  setInput,
-  status,
-  onSubmit,
-}: {
-  input: string;
-  setInput: (v: string) => void;
-  status: ChatStatus;
-  onSubmit: (message: PromptInputMessage) => void;
-}) => (
-  <PromptInput
-    onSubmit={onSubmit}
-    className="mt-4 backdrop-blur-2xl bg-card rounded-2xl border border-border shadow-2xl"
-    globalDrop
-    multiple
-  >
-    <PromptInputHeader>
-      <AttachmentsDisplay />
-    </PromptInputHeader>
-
-    <PromptInputBody>
-      <PromptInputTextarea
-        onChange={(e) => setInput(e.target.value)}
-        value={input}
-        className="bg-transparent border-none focus:outline-none focus-visible:ring-0"
-      />
-    </PromptInputBody>
-
-    <PromptInputFooter className="border-t border-border">
-      <PromptInputTools>
-        <PromptInputActionMenu>
-          <PromptInputActionMenuTrigger />
-          <PromptInputActionMenuContent>
-            <PromptInputActionAddAttachments />
-            <PromptInputActionAddScreenshot />
-          </PromptInputActionMenuContent>
-        </PromptInputActionMenu>
-      </PromptInputTools>
-
-      <PromptInputSubmit disabled={!input && !status} status={status} />
-    </PromptInputFooter>
-  </PromptInput>
-);
-
-// ─── Page ────────────────────────────────────────────────────────────────────
-
 export default function ChatPage() {
   const { id: chatId } = useParams<{ id: string }>();
 
   const [input, setInput] = useState("");
+  const [ingesting, setIngesting] = useState(false);
   const { messages, status, sendMessage } = useChat({ id: chatId });
   const sentInitialRef = useRef(false);
 
@@ -206,25 +139,49 @@ export default function ChatPage() {
     }
   }, [chatId, sendMessage]);
 
-  const handleSubmit = (message: PromptInputMessage) => {
+  const handleSubmit = async (message: PromptInputMessage) => {
     if (!message.text && !message.files?.length) return;
 
-    sendMessage({ text: message.text, files: message.files });
+    if (message.files?.length) {
+      setIngesting(true);
+      try {
+        await ingestFiles(message.files);
+      } catch (e) {
+        console.error(e);
+        setIngesting(false);
+        return;
+      }
+      setIngesting(false);
+    }
+
+    const text =
+      message.text ||
+      (message.files?.length
+        ? `I uploaded ${message.files
+            .map((f) => f.filename)
+            .filter(Boolean)
+            .join(", ")}. Please summarize.`
+        : "");
+
+    if (text) sendMessage({ text });
     setInput("");
   };
 
   return (
-    <div className="min-h-screen w-full bg-background text-foreground relative overflow-hidden">
+    <div className="relative min-h-screen w-full overflow-hidden bg-background text-foreground">
       <BackgroundBlobs />
 
       <div className="relative z-10 mx-auto flex h-screen max-w-4xl flex-col p-6">
         <MessagesList messages={messages} status={status} />
 
-        <ChatInput
+        <ChatComposer
+          busy={ingesting}
+          busyLabel="Ingesting documents…"
+          className="mt-4"
           input={input}
-          setInput={setInput}
-          status={status}
+          onInputChange={setInput}
           onSubmit={handleSubmit}
+          status={status}
         />
       </div>
     </div>

@@ -1,385 +1,92 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
-import { useState } from "react";
-import { cn } from "@/lib/utils";
-import {
-    ImageIcon,
-    FileUp,
-    Layout,
-    MonitorIcon,
-    Paperclip,
-    SendIcon,
-    XIcon,
-    Sparkles,
-    Command,
-} from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
-import * as React from "react";
+import { ChatComposer } from "@/components/chat-composer";
+import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
+import { motion } from "motion/react";
+import { useEffect, useState } from "react";
 
-interface UseAutoResizeTextareaProps {
-    minHeight: number;
-    maxHeight?: number;
+export interface AnimatedAIChatWelcomeProps {
+  onSend: (message: PromptInputMessage) => void | Promise<void>;
+  busy?: boolean;
+  busyLabel?: string;
 }
 
-function useAutoResizeTextarea({ minHeight, maxHeight }: UseAutoResizeTextareaProps) {
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+export function AnimatedAIChatWelcome({
+  onSend,
+  busy,
+  busyLabel,
+}: AnimatedAIChatWelcomeProps) {
+  const [input, setInput] = useState("");
+  const [mouse, setMouse] = useState({ x: 0, y: 0 });
+  const [focused, setFocused] = useState(false);
 
-    const adjustHeight = useCallback(
-        (reset?: boolean) => {
-            const textarea = textareaRef.current;
-            if (!textarea) return;
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => setMouse({ x: e.clientX, y: e.clientY });
+    window.addEventListener("mousemove", onMove);
+    return () => window.removeEventListener("mousemove", onMove);
+  }, []);
 
-            if (reset) {
-                textarea.style.height = `${minHeight}px`;
-                return;
-            }
+  const handleSubmit = async (message: PromptInputMessage) => {
+    if (!message.text && !message.files?.length) return;
+    await onSend(message);
+    setInput("");
+  };
 
-            textarea.style.height = `${minHeight}px`;
-            const newHeight = Math.max(
-                minHeight,
-                Math.min(textarea.scrollHeight, maxHeight ?? Number.POSITIVE_INFINITY)
-            );
+  return (
+    <div className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-background p-6 text-foreground">
+      <div className="pointer-events-none absolute inset-0 h-full w-full overflow-hidden">
+        <div className="absolute top-0 left-1/4 h-96 w-96 animate-pulse rounded-full bg-violet-500/10 mix-blend-normal blur-[128px]" />
+        <div className="absolute right-1/4 bottom-0 h-96 w-96 animate-pulse rounded-full bg-indigo-500/10 mix-blend-normal blur-[128px] delay-700" />
+        <div className="absolute top-1/4 right-1/3 h-64 w-64 animate-pulse rounded-full bg-fuchsia-500/10 mix-blend-normal blur-[96px] delay-1000" />
+      </div>
 
-            textarea.style.height = `${newHeight}px`;
-        },
-        [minHeight, maxHeight]
-    );
+      <div
+        className="relative mx-auto w-full max-w-2xl"
+        onBlur={() => setFocused(false)}
+        onFocus={() => setFocused(true)}
+      >
+        <motion.div
+          animate={{ opacity: 1, y: 0 }}
+          className="relative z-10 space-y-10"
+          initial={{ opacity: 0, y: 20 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+        >
+          <div className="space-y-3 text-center">
+            <motion.h1
+              animate={{ opacity: 1, y: 0 }}
+              className="inline-block bg-linear-to-r from-foreground to-muted-foreground bg-clip-text pb-1 font-medium text-3xl text-transparent tracking-tight"
+              initial={{ opacity: 0, y: 10 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+            >
+              What&apos;s on your mind today?
+            </motion.h1>
+            <motion.div
+              animate={{ width: "100%", opacity: 1 }}
+              className="h-px bg-linear-to-r from-transparent via-border to-transparent"
+              initial={{ width: 0, opacity: 0 }}
+              transition={{ delay: 0.5, duration: 0.8 }}
+            />
+          </div>
 
-    useEffect(() => {
-        const textarea = textareaRef.current;
-        if (textarea) {
-            textarea.style.height = `${minHeight}px`;
-        }
-    }, [minHeight]);
+          <ChatComposer
+            autoFocus
+            busy={busy}
+            busyLabel={busyLabel}
+            input={input}
+            onInputChange={setInput}
+            onSubmit={handleSubmit}
+            placeholder="Ask anything"
+          />
+        </motion.div>
+      </div>
 
-    useEffect(() => {
-        const handleResize = () => adjustHeight();
-        window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
-    }, [adjustHeight]);
-
-    return { textareaRef, adjustHeight };
-}
-
-interface CommandSuggestion {
-    icon: React.ReactNode;
-    label: string;
-    description: string;
-    prefix: string;
-}
-
-interface AnimatedAIChatWelcomeProps {
-    onSend: (message: string) => void;
-}
-
-export function AnimatedAIChatWelcome({ onSend }: AnimatedAIChatWelcomeProps) {
-    const [value, setValue] = useState("");
-    const [attachments, setAttachments] = useState<string[]>([]);
-    const [activeSuggestion, setActiveSuggestion] = useState<number>(-1);
-    const [showCommandPalette, setShowCommandPalette] = useState(false);
-    const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-    const { textareaRef, adjustHeight } = useAutoResizeTextarea({
-        minHeight: 60,
-        maxHeight: 200,
-    });
-    const [inputFocused, setInputFocused] = useState(false);
-    const commandPaletteRef = useRef<HTMLDivElement>(null);
-
-    const commandSuggestions: CommandSuggestion[] = [
-        { icon: <ImageIcon className="w-4 h-4" />, label: "Clone UI", description: "Generate a UI from a screenshot", prefix: "/clone" },
-        { icon: <Layout className="w-4 h-4" />, label: "Import Design", description: "Import a design from a file", prefix: "/design" },
-        { icon: <MonitorIcon className="w-4 h-4" />, label: "Create Page", description: "Generate a new web page", prefix: "/page" },
-        { icon: <Sparkles className="w-4 h-4" />, label: "Improve", description: "Improve existing UI design", prefix: "/improve" },
-    ];
-
-    useEffect(() => {
-        if (value.startsWith("/") && !value.includes(" ")) {
-            setShowCommandPalette(true);
-            const matchingSuggestionIndex = commandSuggestions.findIndex((cmd) => cmd.prefix.startsWith(value));
-            setActiveSuggestion(matchingSuggestionIndex >= 0 ? matchingSuggestionIndex : -1);
-        } else {
-            setShowCommandPalette(false);
-        }
-    }, [value]);
-
-    useEffect(() => {
-        const handleMouseMove = (e: MouseEvent) => setMousePosition({ x: e.clientX, y: e.clientY });
-        window.addEventListener("mousemove", handleMouseMove);
-        return () => window.removeEventListener("mousemove", handleMouseMove);
-    }, []);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            const target = event.target as Node;
-            const commandButton = document.querySelector("[data-command-button]");
-            if (
-                commandPaletteRef.current &&
-                !commandPaletteRef.current.contains(target) &&
-                !commandButton?.contains(target)
-            ) {
-                setShowCommandPalette(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-
-    const handleSendMessage = () => {
-        if (value.trim()) {
-            onSend(value.trim());
-            setValue("");
-            adjustHeight(true);
-        }
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (showCommandPalette) {
-            if (e.key === "ArrowDown") {
-                e.preventDefault();
-                setActiveSuggestion((prev) => (prev < commandSuggestions.length - 1 ? prev + 1 : 0));
-            } else if (e.key === "ArrowUp") {
-                e.preventDefault();
-                setActiveSuggestion((prev) => (prev > 0 ? prev - 1 : commandSuggestions.length - 1));
-            } else if (e.key === "Tab" || e.key === "Enter") {
-                e.preventDefault();
-                if (activeSuggestion >= 0) {
-                    setValue(commandSuggestions[activeSuggestion].prefix + " ");
-                    setShowCommandPalette(false);
-                }
-            } else if (e.key === "Escape") {
-                e.preventDefault();
-                setShowCommandPalette(false);
-            }
-        } else if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            handleSendMessage();
-        }
-    };
-
-    const handleAttachFile = () => {
-        const mockFileName = `file-${Math.floor(Math.random() * 1000)}.pdf`;
-        setAttachments((prev) => [...prev, mockFileName]);
-    };
-
-    const removeAttachment = (index: number) => {
-        setAttachments((prev) => prev.filter((_, i) => i !== index));
-    };
-
-    const selectCommandSuggestion = (index: number) => {
-        setValue(commandSuggestions[index].prefix + " ");
-        setShowCommandPalette(false);
-    };
-
-    return (
-        <div className="min-h-screen flex flex-col w-full items-center justify-center bg-background text-foreground p-6 relative overflow-hidden">
-            <div className="absolute inset-0 w-full h-full overflow-hidden">
-                <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-500/10 rounded-full mix-blend-normal filter blur-[128px] animate-pulse" />
-                <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full mix-blend-normal filter blur-[128px] animate-pulse delay-700" />
-                <div className="absolute top-1/4 right-1/3 w-64 h-64 bg-fuchsia-500/10 rounded-full mix-blend-normal filter blur-[96px] animate-pulse delay-1000" />
-            </div>
-            <div className="w-full max-w-2xl mx-auto relative">
-                <motion.div
-                    className="relative z-10 space-y-12"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, ease: "easeOut" }}
-                >
-                    <div className="text-center space-y-3">
-                        <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.2, duration: 0.5 }}
-                            className="inline-block"
-                        >
-                            <h1 className="text-3xl font-medium tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-muted-foreground pb-1">
-                                How can I help today?
-                            </h1>
-                            <motion.div
-                                className="h-px bg-linear-to-r from-transparent via-border to-transparent"
-                                initial={{ width: 0, opacity: 0 }}
-                                animate={{ width: "100%", opacity: 1 }}
-                                transition={{ delay: 0.5, duration: 0.8 }}
-                            />
-                        </motion.div>
-                        <motion.p
-                            className="text-sm text-muted-foreground"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.3 }}
-                        >
-                            Type a command or ask a question
-                        </motion.p>
-                    </div>
-
-                    <motion.div
-                        className="relative backdrop-blur-2xl bg-card rounded-2xl border border-border shadow-2xl"
-                        initial={{ scale: 0.98 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.1 }}
-                    >
-                        <AnimatePresence>
-                            {showCommandPalette && (
-                                <motion.div
-                                    ref={commandPaletteRef}
-                                    className="absolute left-4 right-4 bottom-full mb-2 backdrop-blur-xl bg-popover text-popover-foreground rounded-lg z-50 shadow-lg border border-border overflow-hidden"
-                                    initial={{ opacity: 0, y: 5 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: 5 }}
-                                    transition={{ duration: 0.15 }}
-                                >
-                                    <div className="py-1">
-                                        {commandSuggestions.map((suggestion, index) => (
-                                            <motion.div
-                                                key={suggestion.prefix}
-                                                className={cn(
-                                                    "flex items-center gap-2 px-3 py-2 text-xs transition-colors cursor-pointer",
-                                                    activeSuggestion === index
-                                                        ? "bg-accent text-accent-foreground"
-                                                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                                                )}
-                                                onClick={() => selectCommandSuggestion(index)}
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                transition={{ delay: index * 0.03 }}
-                                            >
-                                                <div className="w-5 h-5 flex items-center justify-center text-muted-foreground">
-                                                    {suggestion.icon}
-                                                </div>
-                                                <div className="font-medium">{suggestion.label}</div>
-                                                <div className="text-muted-foreground text-xs ml-1">{suggestion.prefix}</div>
-                                            </motion.div>
-                                        ))}
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        <div className="p-4">
-                            <div className="relative w-full">
-                                <textarea
-                                    ref={textareaRef}
-                                    value={value}
-                                    onChange={(e) => {
-                                        setValue(e.target.value);
-                                        adjustHeight();
-                                    }}
-                                    onKeyDown={handleKeyDown}
-                                    onFocus={() => setInputFocused(true)}
-                                    onBlur={() => setInputFocused(false)}
-                                    placeholder="Ask zap a question..."
-                                    className={cn(
-                                        "w-full px-4 py-3 resize-none bg-transparent border-none",
-                                        "text-foreground text-sm focus:outline-none placeholder:text-muted-foreground/60 min-h-[60px]"
-                                    )}
-                                    style={{ overflow: "hidden" }}
-                                />
-                            </div>
-                        </div>
-
-                        <AnimatePresence>
-                            {attachments.length > 0 && (
-                                <motion.div
-                                    className="px-4 pb-3 flex gap-2 flex-wrap"
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: "auto" }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                >
-                                    {attachments.map((file, index) => (
-                                        <motion.div
-                                            key={index}
-                                            className="flex items-center gap-2 text-xs bg-secondary py-1.5 px-3 rounded-lg text-secondary-foreground"
-                                            initial={{ opacity: 0, scale: 0.9 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            exit={{ opacity: 0, scale: 0.9 }}
-                                        >
-                                            <span>{file}</span>
-                                            <button
-                                                onClick={() => removeAttachment(index)}
-                                                className="text-muted-foreground hover:text-foreground transition-colors"
-                                            >
-                                                <XIcon className="w-3 h-3" />
-                                            </button>
-                                        </motion.div>
-                                    ))}
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        <div className="p-4 border-t border-border flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-3">
-                                <motion.button
-                                    type="button"
-                                    onClick={handleAttachFile}
-                                    whileTap={{ scale: 0.94 }}
-                                    className="p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors relative group"
-                                >
-                                    <Paperclip className="w-4 h-4" />
-                                </motion.button>
-                                <motion.button
-                                    type="button"
-                                    data-command-button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setShowCommandPalette((prev) => !prev);
-                                    }}
-                                    whileTap={{ scale: 0.94 }}
-                                    className={cn(
-                                        "p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors relative group",
-                                        showCommandPalette && "bg-accent text-foreground"
-                                    )}
-                                >
-                                    <Command className="w-4 h-4" />
-                                </motion.button>
-                            </div>
-
-                            <motion.button
-                                type="button"
-                                onClick={handleSendMessage}
-                                whileHover={{ scale: 1.01 }}
-                                whileTap={{ scale: 0.98 }}
-                                disabled={!value.trim()}
-                                className={cn(
-                                    "px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2",
-                                    value.trim()
-                                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/10"
-                                        : "bg-secondary text-muted-foreground"
-                                )}
-                            >
-                                <SendIcon className="w-4 h-4" />
-                                <span>Send</span>
-                            </motion.button>
-                        </div>
-                    </motion.div>
-
-                    <div className="flex flex-wrap items-center justify-center gap-2">
-                        {commandSuggestions.map((suggestion, index) => (
-                            <motion.button
-                                key={suggestion.prefix}
-                                onClick={() => selectCommandSuggestion(index)}
-                                className="flex items-center gap-2 px-3 py-2 bg-card hover:bg-accent rounded-lg text-sm text-muted-foreground hover:text-foreground border border-border transition-all relative group"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.1 }}
-                            >
-                                {suggestion.icon}
-                                <span>{suggestion.label}</span>
-                            </motion.button>
-                        ))}
-                    </div>
-                </motion.div>
-            </div>
-
-            {inputFocused && (
-                <motion.div
-                    className="fixed w-200 h-200 rounded-full pointer-events-none z-0 opacity-[0.02] bg-linear-to-r from-violet-500 via-fuchsia-500 to-indigo-500 blur-[96px]"
-                    animate={{
-                        x: (mousePosition?.x ?? 0) - 400,
-                        y: (mousePosition?.y ?? 0) - 400,
-                    }}
-                    transition={{ type: "spring", damping: 25, stiffness: 150, mass: 0.5 }}
-                />
-            )}
-        </div>
-    );
+      {focused && (
+        <motion.div
+          animate={{ x: mouse.x - 400, y: mouse.y - 400 }}
+          className="pointer-events-none fixed z-0 h-200 w-200 rounded-full bg-linear-to-r from-violet-500 via-fuchsia-500 to-indigo-500 opacity-[0.02] blur-[96px]"
+          transition={{ type: "spring", damping: 25, stiffness: 150, mass: 0.5 }}
+        />
+      )}
+    </div>
+  );
 }

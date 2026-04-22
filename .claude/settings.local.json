@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(pnpm add *)",
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm run *)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"exit=$?\")"
     ]
   }
 }
