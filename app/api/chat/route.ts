@@ -29,7 +29,7 @@ function buildSearchTool(userId: string) {
       }),
       execute: async ({ query }) => {
         try {
-          const results = await searchDocuments(query, userId, 3, 0.5);
+          const results = await searchDocuments(query, userId);
 
           if (results.length === 0) {
             return {
@@ -54,7 +54,13 @@ export type ChatMessages = UIMessage<never, UIDataTypes, ChatTools>;
 
 
 
-const SYSTEM_PROMPT = `You are a helpful assistant that answers questions about the user's uploaded documents. When the user asks about content that might be in their docs, call the \`searchKnowledgeBase\` tool with a focused natural-language query. Cite the results you used in your answer. If the tool returns no relevant results, say so plainly instead of guessing.`;
+const SYSTEM_PROMPT = `You are a helpful assistant that answers questions about the user's uploaded documents.
+
+When the user asks about content that might be in their docs, call the \`searchKnowledgeBase\` tool with a focused natural-language query.
+- Rewrite short or ambiguous user questions into a fuller query before searching (e.g. "Future of A" → "future of AI").
+- If the first search returns no results, try ONE more search with a reworded / broader query before giving up.
+- When answering, cite the source filename from the tool output (e.g. "(resume.pdf)").
+- If both searches return nothing, say so plainly instead of guessing.`;
 
 
 export async function POST(req: Request) {
@@ -75,7 +81,7 @@ export async function POST(req: Request) {
       system: SYSTEM_PROMPT,
       messages: await convertToModelMessages(messages),
       tools: buildSearchTool(user.id),
-      stopWhen: stepCountIs(2),
+      stopWhen: stepCountIs(4),
     });
 
     return result.toUIMessageStreamResponse();

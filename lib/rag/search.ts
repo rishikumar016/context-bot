@@ -7,7 +7,7 @@ export async function searchDocuments(
   query: string,
   userId: string,
   limit = 5,
-  threshold = 0.5,
+  threshold = 0.25,
 ) {
   const queryEmbedding = await generateEmbedding(query);
 
