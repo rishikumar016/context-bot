@@ -122,6 +122,7 @@ export type ChatComposerProps = {
   multiple?: boolean;
   autoFocus?: boolean;
   className?: string;
+  allowAttachments?: boolean;
 };
 
 export function ChatComposer({
@@ -139,6 +140,7 @@ export function ChatComposer({
   multiple = true,
   autoFocus,
   className,
+  allowAttachments = true,
 }: ChatComposerProps) {
   const handleError = (err: ComposerError) => {
     if (onError) {
@@ -172,7 +174,7 @@ export function ChatComposer({
       )}
 
       <PromptInputBody>
-        <AttachmentCards />
+        {allowAttachments && <AttachmentCards />}
         <PromptInputTextarea
           autoFocus={autoFocus}
           className="border-none bg-transparent focus:outline-none focus-visible:ring-0"
@@ -183,14 +185,18 @@ export function ChatComposer({
       </PromptInputBody>
 
       <PromptInputFooter>
-        <PromptInputTools>
-          <PromptInputActionMenu>
-            <PromptInputActionMenuTrigger />
-            <PromptInputActionMenuContent>
-              <PromptInputActionAddAttachments label="Upload photos & files" />
-            </PromptInputActionMenuContent>
-          </PromptInputActionMenu>
-        </PromptInputTools>
+        {allowAttachments ? (
+          <PromptInputTools>
+            <PromptInputActionMenu>
+              <PromptInputActionMenuTrigger />
+              <PromptInputActionMenuContent>
+                <PromptInputActionAddAttachments label="Upload photos & files" />
+              </PromptInputActionMenuContent>
+            </PromptInputActionMenu>
+          </PromptInputTools>
+        ) : (
+          <div />
+        )}
 
         <PromptInputSubmit
           disabled={(!input && !status) || busy}
