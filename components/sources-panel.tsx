@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/sidebar";
 import { toast } from "sonner";
 
+
 function getTypeLabel(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase();
   if (!ext) return "FILE";
@@ -97,15 +98,17 @@ export function SourcesPanel() {
   };
 
   return ( 
-    <Sidebar className="">
+    <Sidebar collapsible="icon">
       <SidebarHeader>
+        <SidebarMenu>
         <div className="flex items-baseline gap-2 px-2 py-1">
           <h2 className="font-medium text-sm">Sources</h2>
           <span className="text-muted-foreground text-xs">
             {sources.length}
           </span>
         </div>
-      </SidebarHeader>
+        </SidebarMenu>
+     </SidebarHeader>
 
       <SidebarContent >
         <SidebarGroup>
