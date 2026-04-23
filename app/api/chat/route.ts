@@ -1,16 +1,61 @@
 import {
   streamText,
   tool,
-  embed,
   convertToModelMessages,
   stepCountIs,
-  type UIMessage,
+  InferUITools,
+  UIDataTypes,
+  UIMessage
 } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
 
-export const runtime = "nodejs";
+import { createClient } from "@/lib/supabase/server";
+import { searchDocuments } from "@/lib/rag/search";
+
+
+
+
+function buildSearchTool(userId: string) {
+  return {
+    searchKnowledgeBase: tool({
+      description:
+        "Search the knowledge base for relevant information. " +
+        "Use concise natural-language queries; the embedding model handles paraphrasing.",
+      inputSchema: z.object({
+        query: z
+          .string()
+          .describe("The search query to find relevant information in the documents."),
+      }),
+      execute: async ({ query }) => {
+        try {
+          const results = await searchDocuments(query, userId, 3, 0.5);
+
+          if (results.length === 0) {
+            return {
+              results: [],
+              message: "No relevant information found in the knowledge base.",
+            };
+          }
+          return results
+            .map((r, i) => `[${i + 1}] (${r.sourceName}) ${r.content}`)
+            .join("\n\n");
+        } catch (error) {
+          console.error("Error executing searchKnowledgeBase tool:", error);
+          return { error: "Failed to search knowledge base", results: [] };
+        }
+      },
+    }),
+  };
+}
+
+export type ChatTools = InferUITools<ReturnType<typeof buildSearchTool>>;
+export type ChatMessages = UIMessage<never, UIDataTypes, ChatTools>;
+
+
+
+const SYSTEM_PROMPT = `You are a helpful assistant that answers questions about the user's uploaded documents. When the user asks about content that might be in their docs, call the \`searchKnowledgeBase\` tool with a focused natural-language query. Cite the results you used in your answer. If the tool returns no relevant results, say so plainly instead of guessing.`;
+
 
 export async function POST(req: Request) {
   try {
@@ -23,47 +68,14 @@ export async function POST(req: Request) {
     const {
       messages,
       model = "gpt-4o-mini",
-    }: { messages: UIMessage[]; model?: string } = await req.json();
+    }: { messages: ChatMessages[]; model?: string } = await req.json();
 
     const result = streamText({
       model: openai(model),
-      system:
-        "You are a helpful assistant that answers questions about the user's uploaded documents. " +
-        "When the user asks about content that might be in their docs, call the `searchDocs` tool " +
-        "with a focused natural-language query. Cite the `source_name` of chunks you used in your answer. " +
-        "If the tool returns no relevant results, say so plainly instead of guessing.",
+      system: SYSTEM_PROMPT,
       messages: await convertToModelMessages(messages),
-      stopWhen: stepCountIs(5),
-      tools: {
-        searchDocs: tool({
-          description:
-            "Search the user's uploaded documents for chunks relevant to a query. " +
-            "Use concise natural-language queries; the embedding model handles paraphrasing.",
-          inputSchema: z.object({
-            query: z.string().describe("The search query"),
-            k: z
-              .number()
-              .int()
-              .min(1)
-              .max(10)
-              .default(5)
-              .describe("How many chunks to return"),
-          }),
-          execute: async ({ query, k }) => {
-            const { embedding } = await embed({
-              model: openai.textEmbeddingModel("text-embedding-3-small"),
-              value: query,
-            });
-            const { data, error } = await supabase.rpc("match_documents", {
-              query_embedding: embedding,
-              match_count: k,
-              filter_user: user.id,
-            });
-            if (error) return { error: error.message, results: [] };
-            return { results: data ?? [] };
-          },
-        }),
-      },
+      tools: buildSearchTool(user.id),
+      stopWhen: stepCountIs(2),
     });
 
     return result.toUIMessageStreamResponse();

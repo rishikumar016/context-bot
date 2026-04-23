@@ -1,8 +1,9 @@
-import { embedMany } from "ai";
-import { openai } from "@ai-sdk/openai";
 import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
+import { documents } from "@/lib/db/schema";
 import { extractFileText, isSupportedFile } from "@/lib/rag/parse";
-import { chunkText } from "@/lib/rag/chunk";
+import { chunkContent } from "@/lib/rag/chunking";
+import { generateEmbeddings } from "@/lib/rag/embeddings";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,11 +21,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "No files provided" }, { status: 400 });
   }
 
-  const results: Array<{
-    source_id: string;
-    source_name: string;
-    chunks: number;
-  }> = [];
+  const results: Array<{ source_id: string; source_name: string; chunks: number }> = [];
   const skipped: Array<{ name: string; reason: string }> = [];
 
   for (const file of files) {
@@ -41,32 +38,30 @@ export async function POST(req: Request) {
       continue;
     }
 
-    const chunks = chunkText(text);
+    const chunks = await chunkContent(text);
     if (chunks.length === 0) {
       skipped.push({ name: file.name, reason: "no extractable text" });
       continue;
     }
 
-    const { embeddings } = await embedMany({
-      model: openai.textEmbeddingModel("text-embedding-3-small"),
-      values: chunks,
-    });
+    const embeddings = await generateEmbeddings(chunks);
 
     const sourceId = crypto.randomUUID();
     const rows = chunks.map((content, i) => ({
-      user_id: user.id,
-      source_id: sourceId,
-      source_name: file.name,
+      userId: user.id,
+      sourceId,
+      sourceName: file.name,
       content,
       embedding: embeddings[i],
       metadata: { chunk_index: i, total_chunks: chunks.length },
     }));
 
-    const { error } = await supabase.from("documents").insert(rows);
-    if (error) {
+    try {
+      await db.insert(documents).values(rows);
+    } catch (e) {
       return Response.json(
-        { error: `Insert failed for ${file.name}: ${error.message}` },
-        { status: 500 }
+        { error: `Insert failed for ${file.name}: ${(e as Error).message}` },
+        { status: 500 },
       );
     }
 
