@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FileSearch, Loader2 } from "lucide-react";
+import { Cpu, FileSearch, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -80,9 +80,9 @@ export default function SignUpPage() {
        
         className="mb-8 flex items-center gap-2 text-foreground"
       >
-        <FileSearch className="h-5 w-5 text-primary" />
+        <Cpu className="h-5 w-5 text-primary"/>
         <span className="text-sm font-semibold tracking-tight">
-          Resume Analyzer
+          Context bot
         </span>
       </div>
 
