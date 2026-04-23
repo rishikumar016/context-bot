@@ -9,16 +9,13 @@ import {
 import { cn } from "@/lib/utils";
 import { FileText, Loader2, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { type FileRejection, useDropzone } from "react-dropzone";
-
-const ACCEPT = {
-  "application/pdf": [".pdf"],
-  "text/plain": [".txt"],
-  "text/markdown": [".md"],
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
-    ".docx",
-  ],
-} as const;
+import {
+  FileUpload,
+  FileUploadDropzone,
+  FileUploadTrigger,
+} from "@/components/ui/file-upload";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 function getTypeLabel(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase();
@@ -34,8 +31,9 @@ type SourcesPanelProps = {
 export function SourcesPanel({ className, onClose }: SourcesPanelProps) {
   const [sources, setSources] = useState<SourceSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadKey, setUploadKey] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -52,47 +50,45 @@ export function SourcesPanel({ className, onClose }: SourcesPanelProps) {
     load();
   }, [load]);
 
-  const handleUpload = useCallback(
-    async (files: File[], rejections: FileRejection[]) => {
-      if (rejections.length > 0) {
-        setError(
-          `Unsupported: ${rejections.map((r) => r.file.name).join(", ")}`,
-        );
-      }
-      if (files.length === 0) return;
-      setUploading(true);
+  const handleFileChange = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0 || isUploading) return;
+      
+      setIsUploading(true);
       setError(null);
       try {
         await ingestRawFiles(files);
         await load();
+        toast.success(`Successfully ingested ${files.length} file(s)`);
       } catch (e) {
         setError((e as Error).message);
+        toast.error("Failed to ingest files: " + (e as Error).message);
       } finally {
-        setUploading(false);
+        setIsUploading(false);
+        setUploadKey((k) => k + 1);
       }
     },
-    [load],
+    [load, isUploading],
   );
+
+  const handleFileReject = useCallback((file: File, message: string) => {
+    toast.error(message, {
+      description: `"${file.name.length > 20 ? `${file.name.slice(0, 20)}...` : file.name}" has been rejected`,
+    });
+  }, []);
 
   const handleDelete = async (sourceId: string) => {
     const prev = sources;
     setSources((curr) => curr.filter((s) => s.sourceId !== sourceId));
     try {
       await deleteSource(sourceId);
+      toast.success("Source deleted");
     } catch (e) {
       setSources(prev);
       setError((e as Error).message);
+      toast.error("Failed to delete source");
     }
   };
-
-  const { getRootProps, getInputProps, isDragActive, isDragReject, open } =
-    useDropzone({
-      onDrop: handleUpload,
-      accept: ACCEPT,
-      multiple: true,
-      noClick: true,
-      disabled: uploading,
-    });
 
   return (
     <div className={cn("flex h-full flex-col", className)}>
@@ -124,50 +120,35 @@ export function SourcesPanel({ className, onClose }: SourcesPanelProps) {
       </div>
 
       <div className="px-4 pt-4">
-        <div
-          {...getRootProps({
-            className: cn(
-              "relative rounded-2xl border-2 border-dashed p-6 text-center transition-colors",
-              isDragReject
-                ? "border-destructive/60 bg-destructive/5"
-                : isDragActive
-                  ? "border-violet-400/60 bg-violet-500/5"
-                  : "border-border/60",
-              uploading && "opacity-60",
-            ),
-          })}
+        <FileUpload
+          key={uploadKey}
+          maxFiles={10}
+          maxSize={50 * 1024 * 1024}
+          accept="application/pdf,.txt,.md,.docx,text/plain,text/markdown"
+          onAccept={handleFileChange}
+          onFileReject={handleFileReject}
+          multiple
+          disabled={isUploading}
         >
-          <input {...getInputProps()} />
-          {uploading ? (
-            <div className="flex flex-col items-center gap-2 text-muted-foreground text-xs">
-              <Loader2 className="size-4 animate-spin" />
-              Ingesting…
+          <FileUploadDropzone>
+            <div className="flex flex-col items-center gap-1 text-center">
+              <div className="flex items-center justify-center rounded-full border p-2.5">
+                <Upload className="size-6 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium">Drag & drop files here</p>
+              <p className="text-xs text-muted-foreground">
+                {isUploading
+                  ? "Ingesting files..."
+                  : "Or click to browse (PDF, DOCX, TXT, MD up to 50MB)"}
+              </p>
             </div>
-          ) : (
-            <>
-              <Upload className="mx-auto mb-2 size-5 text-muted-foreground" />
-              <p className="text-muted-foreground text-xs">
-                {isDragReject
-                  ? "Unsupported file type"
-                  : isDragActive
-                    ? "Drop to upload"
-                    : "Drag files here or "}
-                {!isDragActive && (
-                  <button
-                    className="font-medium text-foreground hover:underline"
-                    onClick={open}
-                    type="button"
-                  >
-                    browse
-                  </button>
-                )}
-              </p>
-              <p className="mt-2 text-[10px] text-muted-foreground">
-                PDF · DOCX · TXT · MD
-              </p>
-            </>
-          )}
-        </div>
+            <FileUploadTrigger asChild disabled={isUploading}>
+              <Button variant="outline" size="sm" className="mt-2 w-fit" disabled={isUploading}>
+                {isUploading ? "Uploading..." : "Browse files"}
+              </Button>
+            </FileUploadTrigger>
+          </FileUploadDropzone>
+        </FileUpload>
         {error && (
           <p className="mt-2 px-1 text-[11px] text-destructive">{error}</p>
         )}
