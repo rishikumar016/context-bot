@@ -28,18 +28,9 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuAction,
-  SidebarMenuButton,
-  SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { toast } from "sonner";
-
-
-function getTypeLabel(name: string): string {
-  const ext = name.split(".").pop()?.toLowerCase();
-  if (!ext) return "FILE";
-  return ext.toUpperCase();
-}
+import { SourceItem } from "./source-item";
 
 function useChatIdFromPath(): string | null {
   const pathname = usePathname();
@@ -231,64 +222,16 @@ export function SourcesPanel() {
               </p>
             ) : (
               <SidebarMenu className="">
-                {sources.map((source) => {
-                  const label = getTypeLabel(source.sourceName);
-                  const attached = attachedIds.has(source.sourceId);
-                  return (
-                    <SidebarMenuItem key={source.sourceId}>
-                      <SidebarMenuButton
-                        size="lg"
-                        tooltip={
-                          chatId
-                            ? attached
-                              ? "Attached to this chat"
-                              : "Not attached to this chat"
-                            : source.sourceName
-                        }
-                        onClick={
-                          chatId
-                            ? () =>
-                                handleToggleAttach(source.sourceId, !attached)
-                            : undefined
-                        }
-                      >
-                        {chatId ? (
-                          <input
-                            type="checkbox"
-                            checked={attached}
-                            onChange={(e) =>
-                              handleToggleAttach(
-                                source.sourceId,
-                                e.target.checked,
-                              )
-                            }
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label={`Attach ${source.sourceName} to this chat`}
-                            className="size-4 shrink-0 accent-primary"
-                          />
-                        ) : (
-                          <FileText className="size-5" />
-                        )}
-                        <div className="flex min-w-0 flex-1 flex-col leading-tight">
-                          <span className="truncate font-medium text-sm">
-                            {source.sourceName}
-                          </span>
-                          <span className="text-muted-foreground text-xs">
-                            {label} · {source.chunks} chunks
-                          </span>
-                        </div>
-                      </SidebarMenuButton>
-                      <SidebarMenuAction
-                        aria-label={`Delete ${source.sourceName}`}
-                        onClick={() => handleDelete(source.sourceId)}
-                        showOnHover
-                        className="hover:bg-destructive/10 hover:text-destructive"
-                      >
-                        <Trash2 />
-                      </SidebarMenuAction>
-                    </SidebarMenuItem>
-                  );
-                })}
+                {sources.map((source) => (
+                  <SourceItem
+                    key={source.sourceId}
+                    source={source}
+                    chatId={chatId}
+                    attached={attachedIds.has(source.sourceId)}
+                    onToggleAttach={handleToggleAttach}
+                    onDelete={handleDelete}
+                  />
+                ))}
               </SidebarMenu>
             )}
           </SidebarGroupContent>
