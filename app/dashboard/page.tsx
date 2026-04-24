@@ -1,154 +1,109 @@
-"use client";
+import { FileText, MessageSquareText, Upload } from "lucide-react";
+import Link from "next/link";
+import { redirect } from "next/navigation";
 
+import { DeleteChatButton } from "@/components/delete-chat-button";
+import { NewChatButton } from "@/components/new-chat-button";
 import { Button } from "@/components/ui/button";
-import {
-  FileUpload,
-  FileUploadDropzone,
-  FileUploadTrigger,
-} from "@/components/ui/file-upload";
-import { ingestRawFiles } from "@/lib/ingest-client";
-import { createClient } from "@/lib/supabase/client";
-import { Loader2, Lock, Upload } from "lucide-react";
-import { motion } from "motion/react";
-import { nanoid } from "nanoid";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
+import { listChats } from "@/lib/chat-store";
+import { createClient } from "@/lib/supabase/server";
+import { formatRelativeTime } from "@/lib/relative-time";
 
-export default function DashboardPage() {
-  const router = useRouter();
-  const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+export const dynamic = "force-dynamic";
 
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
-      setIsAuthed(!!data.user);
-    });
-  }, []);
+export default async function DashboardPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
-  const handleUpload = useCallback(
-    async (files: File[]) => {
-      if (!files.length || isUploading) return;
-
-      if (isAuthed === false) {
-        toast.info("Sign in to upload documents");
-        router.push("/login");
-        return;
-      }
-
-      setIsUploading(true);
-      try {
-        await ingestRawFiles(files);
-        toast.success(`Ingested ${files.length} file(s)`);
-        router.push(`/dashboard/chats/${nanoid()}`);
-      } catch (e) {
-        const msg = (e as Error).message;
-        if (msg.includes("401")) {
-          toast.info("Sign in to upload documents");
-          router.push("/login");
-          return;
-        }
-        toast.error("Failed to ingest: " + msg);
-      } finally {
-        setIsUploading(false);
-      }
-    },
-    [isAuthed, isUploading, router],
-  );
-
-  const handleReject = useCallback((file: File, message: string) => {
-    toast.error(message, {
-      description: `"${file.name.length > 20 ? `${file.name.slice(0, 20)}...` : file.name}" has been rejected`,
-    });
-  }, []);
+  const chats = await listChats(user.id);
 
   return (
-    <div className="relative flex flex-1 w-full flex-col items-center justify-center overflow-hidden bg-background p-6 text-foreground">
-      <div className="pointer-events-none absolute inset-0 h-full w-full overflow-hidden">
-        <div className="absolute top-0 left-1/4 h-96 w-96 animate-pulse rounded-full bg-violet-500/10 mix-blend-normal blur-[128px]" />
-        <div className="absolute right-1/4 bottom-0 h-96 w-96 animate-pulse rounded-full bg-indigo-500/10 mix-blend-normal blur-[128px] delay-700" />
-        <div className="absolute top-1/4 right-1/3 h-64 w-64 animate-pulse rounded-full bg-fuchsia-500/10 mix-blend-normal blur-[96px] delay-1000" />
+    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-6 py-8">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h1 className="font-semibold text-2xl tracking-tight">Your chats</h1>
+          <p className="mt-1 text-muted-foreground text-sm">
+            Every conversation you&rsquo;ve had with your documents.
+          </p>
+        </div>
+        <NewChatButton />
       </div>
 
-      <motion.div
-        animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 mx-auto w-full max-w-2xl space-y-10"
-        initial={{ opacity: 0, y: 20 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-      >
-        <div className="space-y-3 text-center">
-          <motion.h1
-            animate={{ opacity: 1, y: 0 }}
-            className="inline-block bg-linear-to-r from-foreground to-muted-foreground bg-clip-text pb-1 font-medium text-3xl text-transparent tracking-tight"
-            initial={{ opacity: 0, y: 10 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-          >
-            Chat with your documents
-          </motion.h1>
-          <motion.p
-            animate={{ opacity: 1 }}
-            className="text-muted-foreground text-sm"
-            initial={{ opacity: 0 }}
-            transition={{ delay: 0.35, duration: 0.5 }}
-          >
-            Drop a PDF, doc, or note to start a conversation grounded in your
-            sources.
-          </motion.p>
-          <motion.div
-            animate={{ width: "100%", opacity: 1 }}
-            className="h-px bg-linear-to-r from-transparent via-border to-transparent"
-            initial={{ width: 0, opacity: 0 }}
-            transition={{ delay: 0.5, duration: 0.8 }}
-          />
+      {chats.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-border border-dashed bg-card/30 py-20 text-center">
+          <div className="flex size-10 items-center justify-center rounded-full border border-border bg-background">
+            <MessageSquareText className="size-5 text-muted-foreground" />
+          </div>
+          <h2 className="mt-4 font-medium text-sm">No chats yet</h2>
+          <p className="mt-1 max-w-sm text-muted-foreground text-xs">
+            Start your first conversation — upload a source if you haven&rsquo;t,
+            then ask a question.
+          </p>
+          <div className="mt-4 flex items-center gap-2">
+            <Button asChild size="sm" variant="outline">
+              <Link href="/upload">
+                <Upload className="size-3.5" />
+                Upload a source
+              </Link>
+            </Button>
+            <NewChatButton size="sm" />
+          </div>
         </div>
+      ) : (
+        <ul className="grid gap-3">
+          {chats.map((chat) => (
+            <li key={chat.id}>
+              <div className="group relative rounded-xl border border-border bg-card/40 p-4 transition hover:border-border/80 hover:bg-card/70">
+                <Link
+                  href={`/dashboard/chats/${chat.id}`}
+                  className="flex flex-col gap-2"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="min-w-0 flex-1 truncate font-medium text-sm">
+                      {chat.title ?? "Untitled chat"}
+                    </h3>
+                    <time className="shrink-0 text-muted-foreground text-xs">
+                      {formatRelativeTime(chat.updatedAt)}
+                    </time>
+                  </div>
 
-        <FileUpload
-          accept="application/pdf,.txt,.md,.docx,text/plain,text/markdown"
-          disabled={isUploading}
-          maxFiles={10}
-          maxSize={50 * 1024 * 1024}
-          multiple
-          onAccept={handleUpload}
-          onFileReject={handleReject}
-        >
-          <FileUploadDropzone className="rounded-3xl border border-border bg-card/50 p-10 shadow-2xl backdrop-blur-2xl">
-            <div className="flex flex-col items-center gap-3 text-center">
-              <div className="flex items-center justify-center rounded-full border p-3">
-                {isUploading ? (
-                  <Loader2 className="size-6 animate-spin text-muted-foreground" />
-                ) : (
-                  <Upload className="size-6 text-muted-foreground" />
-                )}
+                  {chat.lastAssistantPreview && (
+                    <p className="line-clamp-2 text-muted-foreground text-xs leading-relaxed">
+                      {chat.lastAssistantPreview}
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground">
+                      <MessageSquareText className="size-3" />
+                      {chat.messageCount}{" "}
+                      {chat.messageCount === 1 ? "message" : "messages"}
+                    </span>
+                    {chat.sourceNames.slice(0, 3).map((name) => (
+                      <span
+                        key={name}
+                        className="inline-flex max-w-[180px] items-center gap-1 truncate rounded-full border border-border bg-background/60 px-2 py-0.5 text-[11px] text-muted-foreground"
+                      >
+                        <FileText className="size-3 shrink-0" />
+                        <span className="truncate">{name}</span>
+                      </span>
+                    ))}
+                    {chat.sourceNames.length > 3 && (
+                      <span className="text-[11px] text-muted-foreground">
+                        +{chat.sourceNames.length - 3} more
+                      </span>
+                    )}
+                  </div>
+                </Link>
+                <DeleteChatButton chatId={chat.id} />
               </div>
-              <p className="font-medium text-sm">
-                {isUploading
-                  ? "Ingesting documents…"
-                  : "Drag & drop your sources"}
-              </p>
-              <p className="text-muted-foreground text-xs">
-                PDF, DOCX, TXT, MD — up to 50MB each
-              </p>
-              {isAuthed === false && (
-                <p className="mt-1 inline-flex items-center gap-1.5 text-muted-foreground text-xs">
-                  <Lock className="size-3" />
-                  Sign in required to upload
-                </p>
-              )}
-            </div>
-            <FileUploadTrigger asChild disabled={isUploading}>
-              <Button
-                className="mt-4 w-fit"
-                disabled={isUploading}
-                size="sm"
-                variant="outline"
-              >
-                {isUploading ? "Uploading…" : "Browse files"}
-              </Button>
-            </FileUploadTrigger>
-          </FileUploadDropzone>
-        </FileUpload>
-      </motion.div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

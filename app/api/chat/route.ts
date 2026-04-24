@@ -1,20 +1,19 @@
+import { openai } from "@ai-sdk/openai";
 import {
-  streamText,
-  tool,
-  convertToModelMessages,
-  stepCountIs,
   InferUITools,
   UIDataTypes,
-  UIMessage
+  UIMessage,
+  convertToModelMessages,
+  stepCountIs,
+  streamText,
+  tool,
+  validateUIMessages,
 } from "ai";
-import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 
-import { createClient } from "@/lib/supabase/server";
+import { loadChat, saveChat } from "@/lib/chat-store";
 import { searchDocuments } from "@/lib/rag/search";
-
-
-
+import { createClient } from "@/lib/supabase/server";
 
 function buildSearchTool(userId: string) {
   return {
@@ -25,7 +24,9 @@ function buildSearchTool(userId: string) {
       inputSchema: z.object({
         query: z
           .string()
-          .describe("The search query to find relevant information in the documents."),
+          .describe(
+            "The search query to find relevant information in the documents.",
+          ),
       }),
       execute: async ({ query }) => {
         try {
@@ -50,9 +51,7 @@ function buildSearchTool(userId: string) {
 }
 
 export type ChatTools = InferUITools<ReturnType<typeof buildSearchTool>>;
-export type ChatMessages = UIMessage<never, UIDataTypes, ChatTools>;
-
-
+export type ChatMessage = UIMessage<never, UIDataTypes, ChatTools>;
 
 const SYSTEM_PROMPT = `You are a helpful assistant that answers questions about the user's uploaded documents.
 
@@ -61,7 +60,6 @@ When the user asks about content that might be in their docs, call the \`searchK
 - If the first search returns no results, try ONE more search with a reworded / broader query before giving up.
 - When answering, cite the source filename from the tool output (e.g. "(resume.pdf)").
 - If both searches return nothing, say so plainly instead of guessing.`;
-
 
 export async function POST(req: Request) {
   try {
@@ -72,19 +70,47 @@ export async function POST(req: Request) {
     if (!user) return new Response("Unauthorized", { status: 401 });
 
     const {
-      messages,
+      id,
+      message,
       model = "gpt-4o-mini",
-    }: { messages: ChatMessages[]; model?: string } = await req.json();
+    }: { id: string; message: ChatMessage; model?: string } = await req.json();
+
+    if (!id || !message) {
+      return new Response("Missing id or message", { status: 400 });
+    }
+
+    const previous = await loadChat(id, user.id);
+    if (previous === null) {
+      return new Response("Chat not found", { status: 404 });
+    }
+
+    const tools = buildSearchTool(user.id);
+
+    const validated = await validateUIMessages<ChatMessage>({
+      messages: [...previous, message],
+      tools,
+    });
 
     const result = streamText({
       model: openai(model),
       system: SYSTEM_PROMPT,
-      messages: await convertToModelMessages(messages),
-      tools: buildSearchTool(user.id),
+      messages: await convertToModelMessages(validated),
+      tools,
       stopWhen: stepCountIs(4),
     });
 
-    return result.toUIMessageStreamResponse();
+    // Keep consuming the stream even if the client disconnects, so onFinish
+    // still runs and we persist the assistant turn.
+    result.consumeStream();
+
+    return result.toUIMessageStreamResponse({
+      originalMessages: validated,
+      onFinish: ({ messages }) => {
+        saveChat({ chatId: id, userId: user.id, messages }).catch((err) => {
+          console.error("saveChat failed:", err);
+        });
+      },
+    });
   } catch (error) {
     console.error("Error in chat route:", error);
     return new Response("Internal Server Error", { status: 500 });

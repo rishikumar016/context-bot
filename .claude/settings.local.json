@@ -9,7 +9,8 @@
       "Bash(echo \"exit=$?\")",
       "Bash(node --env-file=.env.local ./node_modules/drizzle-kit/bin.cjs generate --name=baseline)",
       "Bash(pnpm db:migrate)",
-      "WebFetch(domain:ai-sdk.dev)"
+      "WebFetch(domain:ai-sdk.dev)",
+      "Bash(npx drizzle-kit *)"
     ]
   }
 }

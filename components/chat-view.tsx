@@ -21,9 +21,9 @@ import {
 } from "@/components/ai-elements/tool";
 import { cn } from "@/lib/utils";
 import { useChat } from "@ai-sdk/react";
-import type { ChatStatus, UIMessage } from "ai";
+import { DefaultChatTransport, type ChatStatus, type UIMessage } from "ai";
 import { Loader } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
 const BackgroundBlobs = () => (
   <div className="pointer-events-none absolute inset-0 h-full w-full overflow-hidden">
@@ -119,20 +119,28 @@ const MessagesList = ({
 
 export type ChatViewProps = {
   chatId: string;
-  initialPrompt?: string;
+  initialMessages?: UIMessage[];
 };
 
-export function ChatView({ chatId, initialPrompt }: ChatViewProps) {
+export function ChatView({ chatId, initialMessages }: ChatViewProps) {
   const [input, setInput] = useState("");
-  const { messages, status, sendMessage } = useChat({ id: chatId });
-  const sentInitialRef = useRef(false);
 
-  useEffect(() => {
-    if (sentInitialRef.current) return;
-    if (!initialPrompt) return;
-    sentInitialRef.current = true;
-    sendMessage({ text: initialPrompt });
-  }, [initialPrompt, sendMessage]);
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        prepareSendMessagesRequest({ messages, id }) {
+          return { body: { id, message: messages[messages.length - 1] } };
+        },
+      }),
+    [],
+  );
+
+  const { messages, status, sendMessage } = useChat({
+    id: chatId,
+    messages: initialMessages,
+    transport,
+  });
 
   const handleSubmit = async (message: PromptInputMessage) => {
     if (!message.text) return;

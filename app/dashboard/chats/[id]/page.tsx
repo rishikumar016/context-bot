@@ -1,23 +1,26 @@
-"use client";
+import { notFound, redirect } from "next/navigation";
 
 import { ChatView } from "@/components/chat-view";
-import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { loadChat } from "@/lib/chat-store";
+import { createClient } from "@/lib/supabase/server";
 
-export default function ChatPage() {
-  const { id: chatId } = useParams<{ id: string }>();
-  const [initialPrompt, setInitialPrompt] = useState<string | undefined>(
-    undefined,
-  );
+export const dynamic = "force-dynamic";
 
-  useEffect(() => {
-    const key = `chat-initial-${chatId}`;
-    const stashed = sessionStorage.getItem(key);
-    if (stashed) {
-      sessionStorage.removeItem(key);
-      setInitialPrompt(stashed);
-    }
-  }, [chatId]);
+export default async function ChatPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
 
-  return <ChatView chatId={chatId} initialPrompt={initialPrompt} />;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const messages = await loadChat(id, user.id);
+  if (messages === null) notFound();
+
+  return <ChatView chatId={id} initialMessages={messages} />;
 }
