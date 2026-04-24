@@ -104,7 +104,7 @@ export function SourcesPanel() {
   };
 
   return ( 
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="offcanvas">
       <SidebarHeader>
         <SidebarMenu>
         <div className="flex items-baseline gap-2 px-2 py-1">
