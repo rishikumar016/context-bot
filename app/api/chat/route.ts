@@ -9,13 +9,16 @@ import {
   tool,
   validateUIMessages,
 } from "ai";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { db } from "@/lib/db";
+import { chatSources } from "@/lib/db/schema";
 import { loadChat, saveChat } from "@/lib/chat-store";
 import { searchDocuments } from "@/lib/rag/search";
 import { createClient } from "@/lib/supabase/server";
 
-function buildSearchTool(userId: string) {
+function buildSearchTool(userId: string, sourceIds: string[]) {
   return {
     searchKnowledgeBase: tool({
       description:
@@ -30,7 +33,15 @@ function buildSearchTool(userId: string) {
       }),
       execute: async ({ query }) => {
         try {
-          const results = await searchDocuments(query, userId);
+          if (sourceIds.length === 0) {
+            return {
+              results: [],
+              message:
+                "No sources are attached to this chat. Ask the user to attach sources from the sidebar.",
+            };
+          }
+
+          const results = await searchDocuments(query, userId, sourceIds);
 
           if (results.length === 0) {
             return {
@@ -84,7 +95,13 @@ export async function POST(req: Request) {
       return new Response("Chat not found", { status: 404 });
     }
 
-    const tools = buildSearchTool(user.id);
+    const attached = await db
+      .select({ sourceId: chatSources.sourceId })
+      .from(chatSources)
+      .where(eq(chatSources.chatId, id));
+    const sourceIds = attached.map((r) => r.sourceId);
+
+    const tools = buildSearchTool(user.id, sourceIds);
 
     const validated = await validateUIMessages<ChatMessage>({
       messages: [...previous, message],

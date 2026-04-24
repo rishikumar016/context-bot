@@ -14,7 +14,7 @@ const client = postgres(process.env.DATABASE_URL, { prepare: false, max: 1 });
 const db = drizzle(client);
 
 try {
-  await migrate(db, { migrationsFolder: "./drizzle" });
+  await migrate(db, { migrationsFolder: "./supabase/migrations" });
   console.log("✓ migrations applied");
 } catch (err) {
   console.error("✗ migration failed:", err.message);

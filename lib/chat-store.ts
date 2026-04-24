@@ -1,10 +1,10 @@
 import "server-only";
 
 import type { UIMessage } from "ai";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { chats } from "@/lib/db/schema";
+import { chatSources, chats, sources } from "@/lib/db/schema";
 
 export type ChatSummary = {
   id: string;
@@ -63,6 +63,26 @@ export async function listChats(userId: string): Promise<ChatSummary[]> {
     .where(eq(chats.userId, userId))
     .orderBy(desc(chats.updatedAt));
 
+  const chatIds = rows.map((r) => r.id);
+  const sourceNamesByChat = new Map<string, string[]>();
+
+  if (chatIds.length > 0) {
+    const joined = await db
+      .select({
+        chatId: chatSources.chatId,
+        name: sources.name,
+      })
+      .from(chatSources)
+      .innerJoin(sources, eq(chatSources.sourceId, sources.id))
+      .where(inArray(chatSources.chatId, chatIds));
+
+    for (const j of joined) {
+      const list = sourceNamesByChat.get(j.chatId) ?? [];
+      list.push(j.name);
+      sourceNamesByChat.set(j.chatId, list);
+    }
+  }
+
   return rows.map((row) => ({
     id: row.id,
     title: row.title,
@@ -70,7 +90,7 @@ export async function listChats(userId: string): Promise<ChatSummary[]> {
     updatedAt: row.updatedAt,
     messageCount: row.messages.length,
     lastAssistantPreview: extractLastAssistantPreview(row.messages),
-    sourceNames: extractSourceNames(row.messages),
+    sourceNames: sourceNamesByChat.get(row.id) ?? [],
   }));
 }
 
@@ -109,22 +129,4 @@ function extractText(message: UIMessage): string {
     .join(" ");
 }
 
-function extractSourceNames(messages: UIMessage[]): string[] {
-  const names = new Set<string>();
-  for (const m of messages) {
-    for (const part of m.parts) {
-      if (
-        part.type === "tool-searchKnowledgeBase" &&
-        part.state === "output-available"
-      ) {
-        const output = part.output;
-        if (typeof output === "string") {
-          for (const match of output.matchAll(/\(([^)]+\.[^)]+)\)/g)) {
-            names.add(match[1]);
-          }
-        }
-      }
-    }
-  }
-  return [...names];
-}
+

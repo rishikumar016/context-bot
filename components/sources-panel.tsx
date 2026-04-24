@@ -1,14 +1,19 @@
 "use client";
 
 import {
+  CHAT_SOURCES_CHANGED_EVENT,
   SOURCES_CHANGED_EVENT,
   type SourceSummary,
+  attachSourceToChat,
   deleteSource,
+  detachSourceFromChat,
   ingestRawFiles,
+  listChatSources,
   listSources,
 } from "@/lib/ingest-client";
 import { FileText, Loader2, Trash2, Upload } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FileUpload,
   FileUploadDropzone,
@@ -36,8 +41,19 @@ function getTypeLabel(name: string): string {
   return ext.toUpperCase();
 }
 
+function useChatIdFromPath(): string | null {
+  const pathname = usePathname();
+  return useMemo(() => {
+    if (!pathname) return null;
+    const match = pathname.match(/^\/dashboard\/chats\/([^/]+)/);
+    return match ? match[1] : null;
+  }, [pathname]);
+}
+
 export function SourcesPanel() {
+  const chatId = useChatIdFromPath();
   const [sources, setSources] = useState<SourceSummary[]>([]);
+  const [attachedIds, setAttachedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,14 +61,18 @@ export function SourcesPanel() {
 
   const load = useCallback(async () => {
     try {
-      const next = await listSources();
-      setSources(next);
+      const [all, attached] = await Promise.all([
+        listSources(),
+        chatId ? listChatSources(chatId) : Promise.resolve([]),
+      ]);
+      setSources(all);
+      setAttachedIds(new Set(attached.map((s) => s.sourceId)));
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [chatId]);
 
   useEffect(() => {
     load();
@@ -60,7 +80,11 @@ export function SourcesPanel() {
       load();
     };
     window.addEventListener(SOURCES_CHANGED_EVENT, onChanged);
-    return () => window.removeEventListener(SOURCES_CHANGED_EVENT, onChanged);
+    window.addEventListener(CHAT_SOURCES_CHANGED_EVENT, onChanged);
+    return () => {
+      window.removeEventListener(SOURCES_CHANGED_EVENT, onChanged);
+      window.removeEventListener(CHAT_SOURCES_CHANGED_EVENT, onChanged);
+    };
   }, [load]);
 
   const handleFileChange = useCallback(
@@ -70,7 +94,8 @@ export function SourcesPanel() {
       setIsUploading(true);
       setError(null);
       try {
-        await ingestRawFiles(files);
+        // When on a chat page, auto-attach uploaded sources to this chat.
+        await ingestRawFiles(files, chatId ?? undefined);
         await load();
         toast.success(`Successfully ingested ${files.length} file(s)`);
       } catch (e) {
@@ -81,7 +106,41 @@ export function SourcesPanel() {
         setUploadKey((k) => k + 1);
       }
     },
-    [load, isUploading],
+    [load, isUploading, chatId],
+  );
+
+  const handleToggleAttach = useCallback(
+    async (sourceId: string, nextChecked: boolean) => {
+      if (!chatId) return;
+      // Optimistic
+      setAttachedIds((curr) => {
+        const next = new Set(curr);
+        if (nextChecked) next.add(sourceId);
+        else next.delete(sourceId);
+        return next;
+      });
+      try {
+        if (nextChecked) {
+          await attachSourceToChat(chatId, sourceId);
+        } else {
+          await detachSourceFromChat(chatId, sourceId);
+        }
+      } catch (e) {
+        // Roll back
+        setAttachedIds((curr) => {
+          const next = new Set(curr);
+          if (nextChecked) next.delete(sourceId);
+          else next.add(sourceId);
+          return next;
+        });
+        toast.error(
+          (nextChecked ? "Attach" : "Detach") +
+            " failed: " +
+            (e as Error).message,
+        );
+      }
+    },
+    [chatId],
   );
 
   const handleFileReject = useCallback((file: File, message: string) => {
@@ -174,14 +233,42 @@ export function SourcesPanel() {
               <SidebarMenu className="">
                 {sources.map((source) => {
                   const label = getTypeLabel(source.sourceName);
+                  const attached = attachedIds.has(source.sourceId);
                   return (
                     <SidebarMenuItem key={source.sourceId}>
                       <SidebarMenuButton
                         size="lg"
-                        tooltip={source.sourceName}
-                      
+                        tooltip={
+                          chatId
+                            ? attached
+                              ? "Attached to this chat"
+                              : "Not attached to this chat"
+                            : source.sourceName
+                        }
+                        onClick={
+                          chatId
+                            ? () =>
+                                handleToggleAttach(source.sourceId, !attached)
+                            : undefined
+                        }
                       >
-                        <FileText className="size-5" />
+                        {chatId ? (
+                          <input
+                            type="checkbox"
+                            checked={attached}
+                            onChange={(e) =>
+                              handleToggleAttach(
+                                source.sourceId,
+                                e.target.checked,
+                              )
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Attach ${source.sourceName} to this chat`}
+                            className="size-4 shrink-0 accent-primary"
+                          />
+                        ) : (
+                          <FileText className="size-5" />
+                        )}
                         <div className="flex min-w-0 flex-1 flex-col leading-tight">
                           <span className="truncate font-medium text-sm">
                             {source.sourceName}
