@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { listChats } from "@/lib/chat-store";
 import { createClient } from "@/lib/supabase/server";
 import { formatRelativeTime } from "@/lib/relative-time";
+import { Card, CardContent } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 
@@ -59,18 +60,19 @@ export default async function DashboardPage() {
         <ul className="grid gap-3">
           {chats.map((chat) => (
             <li key={chat.id}>
-              <div className="group relative rounded-xl border border-border bg-card/40 p-4 transition hover:border-border/80 hover:bg-card/70">
+              <Card className="group relative border border-border bg-card/40 p-4 transition hover:border-border/80 hover:bg-card/70">
                 <Link
                   href={`/dashboard/chats/${chat.id}`}
                   className="flex flex-col gap-2"
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center justify-between gap-3">
                     <h3 className="min-w-0 flex-1 truncate font-medium text-sm">
                       {chat.title ?? "Untitled chat"}
                     </h3>
                     <time className="shrink-0 text-muted-foreground text-xs">
                       {formatRelativeTime(chat.updatedAt)}
                     </time>
+                <DeleteChatButton chatId={chat.id}  />
                   </div>
 
                   {chat.lastAssistantPreview && (
@@ -79,7 +81,7 @@ export default async function DashboardPage() {
                     </p>
                   )}
 
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <CardContent className="flex flex-wrap items-center gap-2 pt-1">
                     <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground">
                       <MessageSquareText className="size-3" />
                       {chat.messageCount}{" "}
@@ -88,7 +90,7 @@ export default async function DashboardPage() {
                     {chat.sourceNames.slice(0, 3).map((name) => (
                       <span
                         key={name}
-                        className="inline-flex max-w-[180px] items-center gap-1 truncate rounded-full border border-border bg-background/60 px-2 py-0.5 text-[11px] text-muted-foreground"
+                        className="inline-flex max-w-45 items-center gap-1 truncate rounded-full border border-border bg-background/60 px-2 py-0.5 text-[11px] text-muted-foreground"
                       >
                         <FileText className="size-3 shrink-0" />
                         <span className="truncate">{name}</span>
@@ -98,11 +100,11 @@ export default async function DashboardPage() {
                       <span className="text-[11px] text-muted-foreground">
                         +{chat.sourceNames.length - 3} more
                       </span>
-                    )}
-                  </div>
+                    )}  
+                  </CardContent>
                 </Link>
-                <DeleteChatButton chatId={chat.id} />
-              </div>
+
+              </Card>
             </li>
           ))}
         </ul>

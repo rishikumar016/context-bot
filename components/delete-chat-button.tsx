@@ -34,7 +34,7 @@ export function DeleteChatButton({ chatId }: { chatId: string }) {
       disabled={deleting}
       size="icon-sm"
       variant="ghost"
-      className="absolute top-3 right-3 text-muted-foreground opacity-0 transition hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+      className="text-muted-foreground opacity-0 transition hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 "
     >
       {deleting ? (
         <Loader2 className="size-3.5 animate-spin" />
