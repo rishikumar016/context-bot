@@ -46,7 +46,7 @@ export default function SignUpPage() {
     setSuccessMessage(null);
 
     const supabase = createClient();
-    const redirectTo = `${window.location.origin}/auth/confirm?next=/`;
+    const redirectTo = `${window.location.origin}/auth/confirm?next=/upload`;
     const { data, error: authError } = await supabase.auth.signUp({
       email: values.email,
       password: values.password,
@@ -63,7 +63,7 @@ export default function SignUpPage() {
 
     // If email confirmation is disabled, Supabase returns a session immediately.
     if (data.session) {
-      router.push("/");
+      router.push("/upload");
       router.refresh();
       return;
     }

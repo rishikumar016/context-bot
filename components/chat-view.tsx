@@ -19,12 +19,6 @@ import {
   ToolInput,
   ToolOutput,
 } from "@/components/ai-elements/tool";
-import { SourcesPanel } from "@/components/sources-panel";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { useChat } from "@ai-sdk/react";
 import type { ChatStatus, UIMessage } from "ai";
@@ -147,40 +141,22 @@ export function ChatView({ chatId, initialPrompt }: ChatViewProps) {
   };
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-background text-foreground">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background text-foreground">
       <BackgroundBlobs />
 
-      <SidebarProvider>
-        <div className="relative z-10 flex h-screen w-full">
-          <SourcesPanel />
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col px-4 pt-4 pb-6 md:px-6">
+        <MessagesList messages={messages} status={status} />
 
-          <SidebarInset className="flex min-w-0 flex-1 flex-col bg-transparent">
-            <header className="flex items-center gap-2 border-border/50 border-b px-4 py-3 md:px-6">
-              <SidebarTrigger
-                aria-label="Toggle sources panel"
-                className="text-muted-foreground hover:text-foreground"
-              />
-              <h1 className="ml-auto truncate font-medium text-muted-foreground text-xs">
-                Chat
-              </h1>
-            </header>
-
-            <div className="flex min-h-0 flex-1 flex-col px-4 pt-4 pb-6 md:px-6">
-              <MessagesList messages={messages} status={status} />
-
-              <ChatComposer
-                allowAttachments={false}
-                className="mt-4"
-                input={input}
-                onInputChange={setInput}
-                onSubmit={handleSubmit}
-                placeholder="Ask about your documents…"
-                status={status}
-              />
-            </div>
-          </SidebarInset>
-        </div>
-      </SidebarProvider>
+        <ChatComposer
+          allowAttachments={false}
+          className="mt-4"
+          input={input}
+          onInputChange={setInput}
+          onSubmit={handleSubmit}
+          placeholder="Ask about your documents…"
+          status={status}
+        />
+      </div>
     </div>
   );
 }
