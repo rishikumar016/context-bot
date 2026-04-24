@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { DeleteChatButton } from "@/components/delete-chat-button";
+import { Header } from "@/components/header";
 import { NewChatButton } from "@/components/new-chat-button";
 import { Button } from "@/components/ui/button";
 import { listChats } from "@/lib/chat-store";
@@ -21,7 +22,9 @@ export default async function DashboardPage() {
   const chats = await listChats(user.id);
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-6 py-8">
+    <div className="flex min-h-screen flex-col">
+      <Header fixed />
+      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-6 py-8">
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="font-semibold text-2xl tracking-tight">Your chats</h1>
@@ -104,6 +107,7 @@ export default async function DashboardPage() {
           ))}
         </ul>
       )}
+      </div>
     </div>
   );
 }

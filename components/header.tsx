@@ -2,12 +2,14 @@ import { ProfileDropdown } from "@/components/profile-dropdown";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 import { SidebarTrigger } from "./ui/sidebar";
+import Link from "next/link";
 
 interface HeaderProps extends React.HTMLAttributes<HTMLElement> {
   fixed?: boolean;
+  showSidebarTrigger?: boolean;
 }
 
-export function Header({ className, fixed = true, ...props }: HeaderProps) {
+export function Header({ className, fixed = true, showSidebarTrigger = false, ...props }: HeaderProps) {
   return (
     <header
       className={cn(
@@ -19,11 +21,11 @@ export function Header({ className, fixed = true, ...props }: HeaderProps) {
     >
       <div className="flex h-14 items-center justify-between gap-4 px-4 sm:px-6">
         <div className="flex items-center gap-3">
-          <SidebarTrigger />
+          {showSidebarTrigger && <SidebarTrigger />}
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Resume Analyzer
-            </p>
+            <Link href="/" className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Context chatBot
+            </Link>
           </div>
         </div>
 
