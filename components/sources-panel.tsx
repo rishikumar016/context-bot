@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  SOURCES_CHANGED_EVENT,
   type SourceSummary,
   deleteSource,
   ingestRawFiles,
@@ -55,6 +56,11 @@ export function SourcesPanel() {
 
   useEffect(() => {
     load();
+    const onChanged = () => {
+      load();
+    };
+    window.addEventListener(SOURCES_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(SOURCES_CHANGED_EVENT, onChanged);
   }, [load]);
 
   const handleFileChange = useCallback(

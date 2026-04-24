@@ -1,6 +1,5 @@
 "use client";
 
-import { ChatView } from "@/components/chat-view";
 import { Button } from "@/components/ui/button";
 import {
   FileUpload,
@@ -18,7 +17,6 @@ import { toast } from "sonner";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [chatId, setChatId] = useState<string | null>(null);
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -43,7 +41,7 @@ export default function DashboardPage() {
       try {
         await ingestRawFiles(files);
         toast.success(`Ingested ${files.length} file(s)`);
-        setChatId(nanoid());
+        router.push(`/dashboard/chats/${nanoid()}`);
       } catch (e) {
         const msg = (e as Error).message;
         if (msg.includes("401")) {
@@ -64,10 +62,6 @@ export default function DashboardPage() {
       description: `"${file.name.length > 20 ? `${file.name.slice(0, 20)}...` : file.name}" has been rejected`,
     });
   }, []);
-
-  if (chatId) {
-    return <ChatView chatId={chatId} />;
-  }
 
   return (
     <div className="relative flex flex-1 w-full flex-col items-center justify-center overflow-hidden bg-background p-6 text-foreground">

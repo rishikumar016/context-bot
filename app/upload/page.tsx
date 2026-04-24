@@ -2,6 +2,7 @@
 
 import { Loader2, Lock, Sparkles, Upload } from "lucide-react";
 import { motion } from "motion/react";
+import { nanoid } from "nanoid";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -42,8 +43,7 @@ export default function UploadPage() {
       try {
         await ingestRawFiles(files);
         toast.success(`Ingested ${files.length} file(s)`);
-        router.push("/dashboard");
-        router.refresh();
+        router.push(`/dashboard/chats/${nanoid()}`);
       } catch (e) {
         const msg = (e as Error).message;
         if (msg.includes("401")) {

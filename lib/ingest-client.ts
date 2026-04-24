@@ -1,5 +1,12 @@
 import type { FileUIPart } from "ai";
 
+export const SOURCES_CHANGED_EVENT = "sources:changed";
+
+function emitSourcesChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(SOURCES_CHANGED_EVENT));
+}
+
 export type IngestResult = {
   results?: Array<{ source_id: string; source_name: string; chunks: number }>;
   skipped?: Array<{ name: string; reason: string }>;
@@ -29,7 +36,9 @@ async function postIngest(fd: FormData): Promise<IngestResult> {
     const errText = await res.text().catch(() => "");
     throw new Error(`Ingest failed: ${res.status} ${errText}`);
   }
-  return res.json();
+  const json = (await res.json()) as IngestResult;
+  emitSourcesChanged();
+  return json;
 }
 
 export type SourceSummary = {
@@ -51,4 +60,5 @@ export async function deleteSource(sourceId: string): Promise<void> {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+  emitSourcesChanged();
 }
