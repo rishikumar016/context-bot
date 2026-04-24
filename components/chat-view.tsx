@@ -56,7 +56,7 @@ const ChatMessage = ({
 
         if (part.type === "tool-searchKnowledgeBase") {
           return (
-            <Tool defaultOpen={false} key={key}>
+            <Tool defaultOpen={false} key={key} className="max-w-3xl">
               <ToolHeader
                 state={part.state}
                 title="Searching your documents"

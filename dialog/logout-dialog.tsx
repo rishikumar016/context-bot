@@ -52,7 +52,7 @@ export function LogoutDialog() {
         </DialogDescription>
       </DialogHeader>
 
-      <DialogFooter className="-mx-6 -mb-6 border-t bg-muted/40 px-6 py-4">
+      <DialogFooter className="border-t bg-muted/40 px-6 py-4">
         <DialogClose asChild>
           <Button variant="outline" disabled={isPending}>
             Cancel
