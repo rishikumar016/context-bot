@@ -11,7 +11,7 @@ export default function ChatsLayout({
     <SidebarProvider>
       <SourcesPanel />
       <SidebarInset className="min-h-screen">
-        <Header fixed showSidebarTrigger />
+        <Header fixed showSidebarTrigger title="Dashboard" href="/dashboard" />
         <div className="flex flex-1 flex-col">{children}</div>
       </SidebarInset>
     </SidebarProvider>

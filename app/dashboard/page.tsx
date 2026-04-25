@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { listChats } from "@/lib/chat-store";
 import { createClient } from "@/lib/supabase/server";
 import { formatRelativeTime } from "@/lib/relative-time";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { DashboardRefresh } from "@/components/dashboard-refresh";
-import { revalidatePath } from "next/cache";
+
 
 export const dynamic = "force-dynamic";
 
@@ -27,18 +27,17 @@ export default async function DashboardPage() {
   return (
     <div className="flex min-h-screen flex-col">
       <DashboardRefresh />
-       revalidatePath("/dashboard");
-      <Header fixed />
-      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-6 py-8">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="font-semibold text-2xl tracking-tight">Your chats</h1>
-          <p className="mt-1 text-muted-foreground text-sm">
-            Every conversation you&rsquo;ve had with your documents.
-          </p>
+      <Header fixed href="/" />
+      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-4 px-4 py-6 sm:gap-6 sm:px-6 sm:py-8">
+        <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="font-semibold text-2xl tracking-tight">Your chats</h1>
+            <p className="mt-1 text-muted-foreground text-sm">
+              Every conversation you&rsquo;ve had with your documents.
+            </p>
+          </div>
+          <NewChatButton />
         </div>
-        <NewChatButton />
-      </div>
 
       {chats.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-border border-dashed bg-card/30 py-20 text-center">
@@ -61,31 +60,33 @@ export default async function DashboardPage() {
           </div>
         </div>
       ) : (
-        <ul className="grid gap-3">
+        <ul className="flex flex-col gap-4 lg:gap-6">
           {chats.map((chat) => (
             <li key={chat.id}>
-              <Card className="group relative border border-border bg-card/40 p-4 transition hover:border-border/80 hover:bg-card/70">
+              <Card className="group relative overflow-hidden border border-border bg-card/40 transition hover:border-border/80 hover:bg-card/70 ">
+                <div className="absolute right-2 top-2 z-10 sm:right-4 sm:top-4 opacity-100 sm:opacity-0 focus-within:opacity-100 group-hover:opacity-100 transition-opacity">
+                  <DeleteChatButton chatId={chat.id} />
+                </div>
                 <Link
                   href={`/dashboard/chats/${chat.id}`}
-                  className="flex flex-col gap-2"
+                  className="flex flex-col gap-2 p-4"
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="min-w-0 flex-1 truncate font-medium text-sm">
+                  <div className="flex items-start justify-between gap-3 pr-8 sm:items-center">
+                    <h3 className="min-w-0 flex-1 truncate font-medium text-[15px] sm:text-sm">
                       {chat.title ?? "Untitled chat"}
                     </h3>
-                    <time className="shrink-0 text-muted-foreground text-xs">
+                    <time className="shrink-0 text-muted-foreground text-xs hidden sm:block">
                       {formatRelativeTime(chat.updatedAt)}
                     </time>
-                <DeleteChatButton chatId={chat.id}  />
                   </div>
 
                   {chat.lastAssistantPreview && (
-                    <p className="line-clamp-2 text-muted-foreground text-xs leading-relaxed">
+                    <p className="line-clamp-2 text-muted-foreground text-[13px] sm:text-xs leading-relaxed">
                       {chat.lastAssistantPreview}
                     </p>
                   )}
 
-                  <CardContent className="flex flex-wrap items-center gap-2 pt-1">
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
                     <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground">
                       <MessageSquareText className="size-3" />
                       {chat.messageCount}{" "}
@@ -94,7 +95,7 @@ export default async function DashboardPage() {
                     {chat.sourceNames.slice(0, 3).map((name) => (
                       <span
                         key={name}
-                        className="inline-flex max-w-45 items-center gap-1 truncate rounded-full border border-border bg-background/60 px-2 py-0.5 text-[11px] text-muted-foreground"
+                        className="inline-flex max-w-32.5 sm:max-w-45 items-center gap-1 truncate rounded-full border border-border bg-background/60 px-2 py-0.5 text-[11px] text-muted-foreground"
                       >
                         <FileText className="size-3 shrink-0" />
                         <span className="truncate">{name}</span>
@@ -105,9 +106,8 @@ export default async function DashboardPage() {
                         +{chat.sourceNames.length - 3} more
                       </span>
                     )}  
-                  </CardContent>
+                  </div>
                 </Link>
-
               </Card>
             </li>
           ))}
