@@ -10,9 +10,9 @@ export default function ChatsLayout({
   return (
     <SidebarProvider>
       <SourcesPanel />
-      <SidebarInset className="min-h-screen">
+      <SidebarInset className="h-dvh overflow-hidden">
         <Header fixed showSidebarTrigger title="Dashboard" href="/dashboard" />
-        <div className="flex flex-1 flex-col">{children}</div>
+        <div className="flex flex-1 flex-col overflow-hidden">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   );

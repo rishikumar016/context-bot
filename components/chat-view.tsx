@@ -152,18 +152,18 @@ export function ChatView({ chatId, initialMessages }: ChatViewProps) {
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background text-foreground">
       <BackgroundBlobs />
 
-      <div className="relative z-10 flex min-h-0 flex-1 flex-col px-4 pt-4 pb-6 md:px-6">
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col px-4 pt-4 pb-4 md:px-6 md:pb-6">
         <MessagesList messages={messages} status={status} />
 
+     <div className="relative mt-4 shrink-0">
         <ChatComposer
-          allowAttachments={false}
-          className="mt-4"
           input={input}
           onInputChange={setInput}
           onSubmit={handleSubmit}
           placeholder="Ask about your documents…"
           status={status}
-        />
+          />
+          </div>
       </div>
     </div>
   );

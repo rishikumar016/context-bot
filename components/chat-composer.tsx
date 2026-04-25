@@ -154,7 +154,7 @@ export function ChatComposer({
     <PromptInput
       accept={accept}
       className={cn(
-        "backdrop-blur-2xl bg-card rounded-3xl border border-border shadow-2xl",
+        "w-full backdrop-blur-2xl bg-card rounded-2xl border border-border shadow-md",
         className
       )}
       globalDrop
